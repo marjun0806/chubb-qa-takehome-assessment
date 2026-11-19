@@ -32,3 +32,5 @@ venv/
 
 # MyPy
 .mypy_cache/
+
+**/target/
