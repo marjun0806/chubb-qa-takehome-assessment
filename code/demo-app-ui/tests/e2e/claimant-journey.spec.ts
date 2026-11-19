@@ -1,12 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
 
 test.describe('Claimant End-to-End Claim Submission Journey', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel('Email').fill('claimant@demo.com');
-    await page.getByLabel('Password', { exact: true }).fill('Claimant123!');
-    await page.getByRole('button', { name: 'Log In', exact: true }).click();
-    await page.waitForURL('**/claims', { timeout: 15_000 });
+    await loginAs(page, 'claimant');
   });
 
   test('should complete 3-step wizard and display newly submitted claim in list', async ({ page }) => {

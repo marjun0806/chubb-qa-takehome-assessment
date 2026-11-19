@@ -67,3 +67,11 @@ During baseline verification and exploratory testing, 7 defects/configuration di
 3. **Next-Phase Extensions:**
    * Re-enable `skipWiremockGeneration=false` and `kafka.producer.schema-validation.enabled=true` in CI to enforce Pact/OpenAPI and AsyncAPI schema contracts automatically.
    * Expand Playwright coverage to include WebSocket live-toast verification between concurrent Admin and Claimant browser contexts.
+---
+
+## 7. What Was Deliberately Left Out (Risk-Based Scope Exclusions)
+In line with sprint prioritization, the following areas were intentionally excluded from this iteration:
+* **Visual Regression & Theme CSS Snapshots:** Functional theme state persistence (`useThemeStore`) and picker interactions are covered in unit tests, while pixel-diff visual regression (Storybook/Chromatic) was deferred because functional RBAC, claim state transitions, and event delivery carry significantly higher business risk.
+* **Cross-Browser Matrix Execution Locally (Firefox/WebKit):** Configured in `playwright.config.ts` for CI pipelines (`process.env.CI`), while local runs target Chromium/Edge for rapid feedback.
+* **K6 Load & WebSocket Fan-Out Stress Testing:** Deferred to post-functional baseline verification once the Debezium CDC vs. Direct Kafka configuration discrepancy (`BUG-02`) is resolved.
+* **Full Testcontainers PostgreSQL/Redis Repository Suite:** Repository contracts and service orchestration are thoroughly verified via unit/slice tests (`199` tests in `claims-service`), avoiding Docker-in-Docker overhead during rapid local PR loops.
