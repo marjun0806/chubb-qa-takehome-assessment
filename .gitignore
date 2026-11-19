@@ -34,3 +34,6 @@ venv/
 .mypy_cache/
 
 **/target/
+
+target/
+**/target/
