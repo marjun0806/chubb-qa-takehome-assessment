@@ -1,11 +1,15 @@
 # Bug Report & Quality Assessment
 
-## BUG-01: Broken Unit Test Compilation in `UpdateClaimStatusUseCaseTest`
+## BUG-01: Broken Unit Test Suite & Missing Maven Wrapper Configuration (`claims-service`)
 - **Severity:** High
-- **Component:** `claims-service` (`src/test/java/.../UpdateClaimStatusUseCaseTest.java`)
-- **Steps to Reproduce:** Run `mvn test` inside `code/claims-service`.
-- **Expected Behavior:** The test suite compiles and executes cleanly.
-- **Actual Behavior:** Compilation fails due to a constructor mismatch—`UpdateClaimStatusUseCase` expects `ApplicationEventPublisher` as a 4th constructor argument, which is omitted in the test setup.
+- **Component:** `claims-service` (`UpdateClaimStatusUseCaseTest`, `CreateClaimUseCaseTest`, `KafkaDomainEventPublisherTest`, and `.mvn/wrapper/`)
+- **Steps to Reproduce:** Run `.\mvnw.cmd test` or `mvn test` inside `code/claims-service`.
+- **Expected Behavior:** The Maven wrapper initializes cleanly and all unit tests compile and pass.
+- **Actual Behavior:**
+  1. `.\mvnw.cmd` fails immediately because `.mvn/wrapper/maven-wrapper.properties` is missing from the repository.
+  2. `UpdateClaimStatusUseCaseTest` fails to compile due to a constructor mismatch (`ApplicationEventPublisher` omitted as the 4th argument).
+  3. `CreateClaimUseCaseTest` fails with `NullPointerException` (3 errors) because `@Mock ApplicationEventPublisher` is missing in the Mockito setup.
+  4. `KafkaDomainEventPublisherTest` fails with `NullPointerException` (6 failures/errors) because it stubs `ObjectMapper.writeValueAsString(event)` on a mock instead of supporting the `ObjectNode` envelope built via `objectMapper.createObjectNode()`.
 
 ## BUG-02: Silent Domain Event Drop & Broken Real-Time Sync in Default Startup
 - **Severity:** High

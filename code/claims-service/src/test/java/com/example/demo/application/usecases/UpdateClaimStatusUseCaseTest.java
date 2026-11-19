@@ -15,6 +15,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -31,6 +33,7 @@ class UpdateClaimStatusUseCaseTest {
     private ClaimRepository claimRepository;
     private UserRepository userRepository;
     private MeterRegistry meterRegistry;
+    private ApplicationEventPublisher eventPublisher;
     private UpdateClaimStatusUseCase useCase;
 
     private static final UUID CLAIM_ID = UUID.randomUUID();
@@ -42,7 +45,9 @@ class UpdateClaimStatusUseCaseTest {
         claimRepository = mock(ClaimRepository.class);
         userRepository = mock(UserRepository.class);
         meterRegistry = new SimpleMeterRegistry();
-        useCase = new UpdateClaimStatusUseCase(claimRepository, userRepository, meterRegistry);
+        eventPublisher = mock(ApplicationEventPublisher.class);
+        useCase = new UpdateClaimStatusUseCase(claimRepository, userRepository, meterRegistry, eventPublisher);
+        ReflectionTestUtils.setField(useCase, "cdcEnabled", false);
     }
 
     // TC-031: Use case orchestration logic tested with mocked repositories
@@ -65,6 +70,34 @@ class UpdateClaimStatusUseCaseTest {
         assertNotNull(result);
         assertEquals(ClaimStatus.UNDER_REVIEW, result.getStatus());
         verify(claimRepository).save(claim);
+    verify(eventPublisher, atLeastOnce()).publishEvent(any(Object.class));
+        assertTrue(claim.getDomainEvents().isEmpty(), "Domain events should be cleared after publishing");
+        assertEquals(1.0, meterRegistry.counter("claims.status.changed",
+                "oldStatus", "SUBMITTED",
+                "newStatus", "UNDER_REVIEW",
+                "adminUserId", ADMIN_USER_ID.toString()).count());
+    }
+
+    @Test
+    void should_NotPublishEventsDirectly_When_CdcEnabled() {
+        // Arrange
+        ReflectionTestUtils.setField(useCase, "cdcEnabled", true);
+        User adminUser = createAdminUser(ADMIN_USER_ID);
+        Claim claim = createClaim(ClaimStatus.SUBMITTED);
+
+        when(userRepository.findById(UserId.of(ADMIN_USER_ID))).thenReturn(Optional.of(adminUser));
+        when(claimRepository.findById(CLAIM_ID)).thenReturn(Optional.of(claim));
+        when(claimRepository.save(any(Claim.class))).thenReturn(claim);
+
+        var command = new UpdateClaimStatusCommand(CLAIM_ID, ClaimStatus.UNDER_REVIEW, ADMIN_USER_ID);
+
+        // Act
+        Claim result = useCase.execute(command);
+
+        // Assert
+        assertEquals(ClaimStatus.UNDER_REVIEW, result.getStatus());
+        verify(claimRepository).save(claim);
+        verifyNoInteractions(eventPublisher);
     }
 
     // TC-058: Non-admin user cannot update status (throws UnauthorizedException)
@@ -79,6 +112,7 @@ class UpdateClaimStatusUseCaseTest {
         // Act & Assert
         assertThrows(UnauthorizedException.class, () -> useCase.execute(command));
         verify(claimRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     // TC-059: Claim not found throws ClaimNotFoundException
@@ -94,6 +128,7 @@ class UpdateClaimStatusUseCaseTest {
         // Act & Assert
         assertThrows(ClaimNotFoundException.class, () -> useCase.execute(command));
         verify(claimRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -110,6 +145,7 @@ class UpdateClaimStatusUseCaseTest {
         // Act & Assert
         assertThrows(InvalidStatusTransitionException.class, () -> useCase.execute(command));
         verify(claimRepository, never()).save(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -121,6 +157,7 @@ class UpdateClaimStatusUseCaseTest {
 
         // Act & Assert
         assertThrows(UnauthorizedException.class, () -> useCase.execute(command));
+        verifyNoInteractions(eventPublisher);
     }
 
     private User createAdminUser(UUID userId) {
