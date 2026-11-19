@@ -34,3 +34,20 @@
 - **Steps to Reproduce:** Inspect `TestEventController.java` (`POST /api/test/trigger-event`).
 - **Expected Behavior:** Test utilities and mock event triggers reside under `src/test/java`.
 - **Actual Behavior:** `TestEventController` lives in `src/main/java`. Although guarded by `@Profile("test")`, keeping test endpoints in production source increases risk if profiles are misconfigured.
+
+## BUG-06: Inaccurate & Incomplete OpenAPI / Swagger Specifications (`claims-service` & `bff-service`)
+- **Severity:** Low (API Contract / Documentation)
+- **Component:** OpenAPI / Swagger annotations across `claims-service` (`:8080`) and `bff-service` (`:8090`)
+- **Steps to Reproduce:** Open `http://localhost:8080/swagger-ui/index.html` and `http://localhost:8090/swagger-ui/index.html`, and inspect the response schemas and examples for `POST /api/claims`, `GET /api/claims`, and `GET`/`PATCH /api/admin/claims`.
+- **Expected Behavior:** All HTTP error codes (`401`, `403`, `404`) are documented consistently, error examples reflect their respective status codes, and sample request/response payloads satisfy domain validation rules.
+- **Actual Behavior:**
+  1. `401` is marked `Undocumented` on `GET /api/claims` and `POST /api/claims` (`:8080`), and `403` is marked `Undocumented` on `POST /api/claims` (`:8090`).
+  2. Error examples for `401`, `403`, and `404` across both services copy-paste a `400 Validation Error` payload (`"status": 400`, `"detail": "User ID is required"` or `"Incident date cannot be in the future"`).
+  3. Request/response examples use `"incidentLocation": "123"` (3 characters), violating `Claim.java`'s 5-character minimum length constraint.
+
+## BUG-07: Non-RFC 7807 Error Format Returned on BFF `403 Forbidden` Responses
+- **Severity:** Medium (API Contract Consistency)
+- **Component:** `bff-service` (`SecurityConfig` / Spring Security access-denied handling)
+- **Steps to Reproduce:** Authenticate via `POST /api/auth/login` in `http://localhost:8090/swagger-ui/index.html` (without attaching an `X-XSRF-TOKEN` header) and execute `POST /api/claims`.
+- **Expected Behavior:** The BFF returns an RFC 7807 `ProblemDetail` JSON object (`type`, `title`, `status`, `detail`, `instance`) consistent with its OpenAPI error contract.
+- **Actual Behavior:** Spring Security returns a default Spring Boot error map (`{"timestamp": "...", "status": 403, "error": "Forbidden", "path": "/api/claims"}`), deviating from the RFC 7807 `ProblemDetail` schema expected by API clients.
